@@ -1,0 +1,62 @@
+{
+  "name": "@codewithahsan/paperclip-plugin-gsd",
+  "version": "0.1.0",
+  "description": "GSD (Get Shit Done) plugin for Paperclip. Syncs phases, milestones, and progress from agent workspaces into Paperclip issues and UI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ahsan Ayaz <ahsan@codewithahsan.dev>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AhsanAyaz/paperclip-plugin-gsd"
+  },
+  "keywords": [
+    "paperclip",
+    "plugin",
+    "gsd",
+    "get-shit-done",
+    "project-management",
+    "ai-agents",
+    "claude-code",
+    "gemini-cli"
+  ],
+  "exports": {
+    ".": "./dist/worker.js",
+    "./manifest": "./dist/manifest.js",
+    "./ui": "./dist/ui/index.js"
+  },
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "build:watch": "node esbuild.config.mjs --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "^2026.318.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
