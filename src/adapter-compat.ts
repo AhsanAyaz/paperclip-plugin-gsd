@@ -8,6 +8,7 @@ import type { AdapterCompat } from "./gsd-types.js";
  */
 const ADAPTER_COMPAT: Record<string, AdapterCompat> = {
   claude_local: "supported",
+  opencode_local: "supported",
   process: "partial",
 };
 

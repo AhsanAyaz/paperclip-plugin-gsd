@@ -220,7 +220,7 @@ Contributions are welcome! Whether it's a bug fix, a new feature, or better docs
 
 - **Paperclip** — tested with the latest version
 - **GSD** — compatible with the GSD `.planning/` directory format
-- **Agents** — works with Claude Code (`claude_local` adapter, full support), process-based agents (partial support). Other adapters will show an informational message.
+- **Agents** — works with Claude Code (`claude_local` adapter, full support), OpenCode (`opencode_local` adapter, full support), process-based agents (partial support). Other adapters will show an informational message.
 
 ## License
 
