@@ -1,0 +1,63 @@
+diff --git a/node_modules/@paperclipai/plugin-sdk/dist/worker-rpc-host.js b/node_modules/@paperclipai/plugin-sdk/dist/worker-rpc-host.js
+index 1dcbf8c..6568c59 100644
+--- a/node_modules/@paperclipai/plugin-sdk/dist/worker-rpc-host.js
++++ b/node_modules/@paperclipai/plugin-sdk/dist/worker-rpc-host.js
+@@ -34,9 +34,13 @@
+  * @see PLUGIN_SPEC.md §14 — SDK Surface
+  */
+ import path from "node:path";
++import { AsyncLocalStorage } from "node:async_hooks";
+ import { createInterface } from "node:readline";
+ import { fileURLToPath } from "node:url";
+ import { JSONRPC_ERROR_CODES, PLUGIN_RPC_ERROR_CODES, createRequest, createSuccessResponse, createErrorResponse, createNotification, parseMessage, serializeMessage, isJsonRpcRequest, isJsonRpcResponse, isJsonRpcNotification, isJsonRpcSuccessResponse, isJsonRpcErrorResponse, JsonRpcParseError, JsonRpcCallError, } from "./protocol.js";
++// Tracks the current invocation id so worker→host calls made inside a
++// host→worker handler propagate `paperclipInvocationId` for scope enforcement.
++const invocationStore = new AsyncLocalStorage();
+ // ---------------------------------------------------------------------------
+ // Constants
+ // ---------------------------------------------------------------------------
+@@ -176,6 +180,10 @@ export function startWorkerRpcHost(options) {
+             });
+             try {
+                 const request = createRequest(method, params, id);
++                const invocationId = invocationStore.getStore()?.invocationId;
++                if (invocationId) {
++                    request.paperclipInvocationId = invocationId;
++                }
+                 sendMessage(request);
+             }
+             catch (err) {
+@@ -603,8 +611,11 @@ export function startWorkerRpcHost(options) {
+      */
+     async function handleHostRequest(request) {
+         const { id, method, params } = request;
++        const invocationId = request.paperclipInvocation?.id;
+         try {
+-            const result = await dispatchMethod(method, params);
++            const result = invocationId
++                ? await invocationStore.run({ invocationId }, () => dispatchMethod(method, params))
++                : await dispatchMethod(method, params);
+             sendMessage(createSuccessResponse(id, result ?? null));
+         }
+         catch (err) {
+@@ -859,12 +870,19 @@ export function startWorkerRpcHost(options) {
+             }
+             else if (notif.method === "onEvent" && notif.params) {
+                 // Plugin event bus notifications — dispatch to registered event handlers
+-                handleOnEvent(notif.params).catch((err) => {
++                const invocationId = notif.paperclipInvocation?.id;
++                const run = () => handleOnEvent(notif.params).catch((err) => {
+                     notifyHost("log", {
+                         level: "error",
+                         message: `Failed to handle event notification: ${err instanceof Error ? err.message : String(err)}`,
+                     });
+                 });
++                if (invocationId) {
++                    invocationStore.run({ invocationId }, run);
++                }
++                else {
++                    run();
++                }
+             }
+         }
+     }

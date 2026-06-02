@@ -25,8 +25,7 @@ const DEFAULT_CONFIG: GsdConfig = {
   syncIntervalSeconds: 30,
 };
 
-let syncTimer: ReturnType<typeof setInterval> | null = null;
-let storedCtx: PluginContext | null = null;
+
 
 function emptyPluginState(): GsdPluginState {
   return {
@@ -88,63 +87,35 @@ async function syncWorkspace(
 }
 
 /**
- * Sync all projects across all companies.
+ * Sync workspaces for a project on-demand if auto-sync is enabled.
  */
-async function syncAllCompanies(ctx: PluginContext): Promise<void> {
+async function syncOnDemand(
+  ctx: PluginContext,
+  companyId: string,
+  projectId: string,
+): Promise<void> {
   try {
-    const companies = await ctx.companies.list();
+    const savedConfig = (await ctx.state.get({
+      scopeKind: "instance",
+      stateKey: "gsd-config",
+    })) as GsdConfig | null;
+    const config = { ...DEFAULT_CONFIG, ...savedConfig };
 
-    for (const company of companies) {
-      const projects = await ctx.projects.list({
-        companyId: company.id,
-        limit: 100,
-        offset: 0,
-      });
+    if (!config.autoSyncEnabled) {
+      return;
+    }
 
-      for (const project of projects) {
-        const workspaces = await ctx.projects.listWorkspaces(
-          project.id,
-          company.id,
-        );
-        for (const ws of workspaces) {
-          await syncWorkspace(ctx, ws, company.id, project.id);
-        }
-      }
+    const workspaces = await ctx.projects.listWorkspaces(
+      projectId,
+      companyId,
+    );
+    for (const ws of workspaces) {
+      await syncWorkspace(ctx, ws, companyId, projectId);
     }
   } catch (err) {
-    ctx.logger.error("Periodic GSD sync failed", {
+    ctx.logger.warn(`On-demand GSD sync failed for project ${projectId}`, {
       error: err instanceof Error ? err.message : String(err),
     });
-  }
-}
-
-/**
- * Start or restart the periodic sync timer.
- */
-function startPeriodicSync(ctx: PluginContext, config: GsdConfig): void {
-  stopPeriodicSync();
-
-  if (!config.autoSyncEnabled) {
-    ctx.logger.info("GSD auto-sync disabled");
-    return;
-  }
-
-  const intervalMs = Math.max(10, config.syncIntervalSeconds ?? 30) * 1000;
-  ctx.logger.info(`GSD auto-sync started (every ${intervalMs / 1000}s)`);
-
-  syncTimer = setInterval(() => {
-    syncAllCompanies(ctx).catch((err) => {
-      ctx.logger.error("GSD periodic sync error", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-  }, intervalMs);
-}
-
-function stopPeriodicSync(): void {
-  if (syncTimer) {
-    clearInterval(syncTimer);
-    syncTimer = null;
   }
 }
 
@@ -212,7 +183,7 @@ async function safeCreateComment(
   body: string,
 ): Promise<void> {
   try {
-    await ctx.issues.createComment(issueId, { body }, companyId);
+    await ctx.issues.createComment(issueId, body, companyId);
   } catch (err) {
     ctx.logger.warn("Failed to create issue comment", {
       issueId,
@@ -225,12 +196,6 @@ async function safeCreateComment(
 
 const plugin = definePlugin({
   async setup(ctx) {
-    // --- Start periodic sync ---
-    storedCtx = ctx;
-    const rawConfig = await ctx.config.get();
-    const config: GsdConfig = { ...DEFAULT_CONFIG, ...(rawConfig as GsdConfig) };
-    startPeriodicSync(ctx, config);
-
     // --- Event: agent run finished => sync GSD state ---
     ctx.events.on("agent.run.finished", async (event: PluginEvent) => {
       const agentId = event.entityId;
@@ -239,7 +204,8 @@ const plugin = definePlugin({
 
       try {
         // Get agent to check adapter compatibility
-        const agent = await ctx.agents.get(agentId);
+        const agent = await ctx.agents.get(agentId, companyId);
+        if (!agent) return;
         const compat = getAdapterCompat(agent.adapterType);
         if (compat === "unsupported") return;
 
@@ -320,6 +286,8 @@ const plugin = definePlugin({
 
       const summaries: GsdProjectSummary[] = [];
       for (const project of projects) {
+        await syncOnDemand(ctx, companyId, project.id);
+
         const state = (await ctx.state.get({
           scopeKind: "project",
           scopeId: project.id,
@@ -345,7 +313,12 @@ const plugin = definePlugin({
 
     ctx.data.register(DATA_KEYS.PROJECT_DETAIL, async (params) => {
       const projectId = params?.projectId as string;
+      const companyId = params?.companyId as string;
       if (!projectId) return null;
+
+      if (companyId) {
+        await syncOnDemand(ctx, companyId, projectId);
+      }
 
       const state = (await ctx.state.get({
         scopeKind: "project",
@@ -359,7 +332,12 @@ const plugin = definePlugin({
     ctx.data.register(DATA_KEYS.ISSUE_PHASE, async (params) => {
       const issueId = params?.issueId as string;
       const projectId = params?.projectId as string;
+      const companyId = params?.companyId as string;
       if (!issueId || !projectId) return null;
+
+      if (companyId) {
+        await syncOnDemand(ctx, companyId, projectId);
+      }
 
       const state = (await ctx.state.get({
         scopeKind: "project",
@@ -481,8 +459,7 @@ const plugin = definePlugin({
         updated,
       );
 
-      // Restart timer with new config
-      startPeriodicSync(ctx, updated);
+
 
       return { ok: true, config: updated };
     });
@@ -518,16 +495,6 @@ const plugin = definePlugin({
     });
   },
 
-  async onConfigChanged(newConfig) {
-    if (storedCtx) {
-      const config: GsdConfig = { ...DEFAULT_CONFIG, ...(newConfig as GsdConfig) };
-      startPeriodicSync(storedCtx, config);
-    }
-  },
-
-  async onShutdown() {
-    stopPeriodicSync();
-  },
 });
 
 export default plugin;

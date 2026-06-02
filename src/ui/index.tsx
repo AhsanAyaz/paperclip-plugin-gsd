@@ -162,7 +162,7 @@ export function GsdProjectTab({ context }: PluginDetailTabProps) {
   const projectId = context.entityId;
   const { data, loading, refresh } = usePluginData<GsdPluginState | null>(
     "gsd-project-detail",
-    { projectId },
+    { projectId, companyId: context.companyId },
   );
   const syncProject = usePluginAction("sync-project");
   const toast = usePluginToast();
@@ -375,6 +375,7 @@ export function GsdIssueTab({ context }: PluginDetailTabProps) {
   } | null>("gsd-issue-phase", {
     issueId: context.entityId,
     projectId: context.projectId ?? context.parentEntityId,
+    companyId: context.companyId,
   });
 
   if (loading) return <div style={muted}>Loading...</div>;
