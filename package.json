@@ -1,6 +1,6 @@
 {
   "name": "@codewithahsan/paperclip-plugin-gsd",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GSD (Get Shit Done) plugin for Paperclip. Syncs phases, milestones, and progress from agent workspaces into Paperclip issues and UI.",
   "type": "module",
   "license": "MIT",
