@@ -45,7 +45,7 @@ The plugin syncs GSD state in three ways:
 flowchart TD
     A[Agent finishes a run] -->|event: agent.run.finished| S[Sync workspace]
     B[New workspace created] -->|event: project.workspace_created| S
-    C[Periodic timer] -->|every N seconds| S
+    C[UI loaded/viewed] -->|on-demand refresh| S
     D[Manual button click] -->|action: sync-project| S
 
     S --> P[Parse .planning/]
@@ -125,8 +125,8 @@ Once installed, the plugin adds five UI components to Paperclip:
 
 Open the GSD Settings page in Paperclip to configure:
 
-- **Auto-sync** — Enable/disable periodic syncing (default: enabled)
-- **Sync interval** — How often to check for GSD changes, 10–600 seconds (default: 30s)
+- **Auto-sync** — Enable/disable on-demand sync when loading GSD views (default: enabled)
+- **Sync interval** — Configured sync interval threshold (default: 30s)
 
 ### Linking phases to issues
 
@@ -159,7 +159,7 @@ src/
 - **Read-only** — The plugin never modifies `.planning/` files. GSD is the single source of truth.
 - **File-based detection** — Phase status is inferred from which files exist (CONTEXT.md, RESEARCH.md, PLAN.md, SUMMARY.md, VERIFICATION.md, UAT.md), not from any configuration.
 - **Adapter-aware** — Not all agent adapters support GSD. The plugin detects compatibility and surfaces it clearly in the settings page.
-- **Event-driven + periodic** — Syncs happen on agent run completion, workspace creation, and on a configurable timer. Manual sync is always available.
+- **Event-driven + On-demand** — Syncs happen on agent run completion, workspace creation, and on-demand when loading GSD tabs or dashboard widgets. Manual sync is also available via the toolbar.
 
 ## Development
 
